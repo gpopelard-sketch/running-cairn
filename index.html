@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Running Cairn</title>
+<meta name="theme-color" content="#0d0e1a">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Running Cairn">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-180.png">
+<style>
+  html, body { margin: 0; padding: 0; background: #0d0e1a; -webkit-tap-highlight-color: transparent; overscroll-behavior-y: none; }
+  #root { min-height: 100vh; }
+</style>
+<script type="importmap">
+{
+  "imports": {
+    "react": "https://esm.sh/react@18.2.0",
+    "react-dom": "https://esm.sh/react-dom@18.2.0",
+    "react-dom/client": "https://esm.sh/react-dom@18.2.0/client",
+    "recharts": "https://esm.sh/recharts@2.12.7?deps=react@18.2.0,react-dom@18.2.0"
+  }
+}
+</script>
+</head>
+<body>
+<div id="root"></div>
+<script>
+  // Remplace l'API window.storage propre à Claude par un équivalent basé sur localStorage,
+  // pour que l'appli fonctionne de façon autonome une fois déployée hors de Claude.
+  window.storage = {
+    get: function (key) {
+      return new Promise(function (resolve, reject) {
+        var raw = localStorage.getItem('rc:' + key);
+        if (raw === null) { reject(new Error('Key not found: ' + key)); return; }
+        resolve({ key: key, value: raw, shared: false });
+      });
+    },
+    set: function (key, value) {
+      return new Promise(function (resolve) {
+        localStorage.setItem('rc:' + key, value);
+        resolve({ key: key, value: value, shared: false });
+      });
+    },
+    delete: function (key) {
+      return new Promise(function (resolve) {
+        localStorage.removeItem('rc:' + key);
+        resolve({ key: key, deleted: true, shared: false });
+      });
+    },
+    list: function (prefix) {
+      return new Promise(function (resolve) {
+        var keys = [];
+        for (var i = 0; i < localStorage.length; i++) {
+          var k = localStorage.key(i);
+          if (k && k.indexOf('rc:') === 0) {
+            var name = k.slice(3);
+            if (!prefix || name.indexOf(prefix) === 0) keys.push(name);
+          }
+        }
+        resolve({ keys: keys, prefix: prefix, shared: false });
+      });
+    }
+  };
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', function () {
+      navigator.serviceWorker.register('service-worker.js').catch(function () {});
+    });
+  }
+</script>
+<script type="module" src="app.js"></script>
+</body>
+</html>
