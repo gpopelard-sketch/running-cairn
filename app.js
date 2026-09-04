@@ -143,6 +143,8 @@ export default function RunningCairn() {
     const [focusYear, setFocusYear] = useState(new Date(todayISO()).getFullYear());
     const [chartType, setChartType] = useState('bar');
     const [historyFilter, setHistoryFilter] = useState('all');
+    const [exportOpen, setExportOpen] = useState(false);
+    const [copyDone, setCopyDone] = useState(false);
     const [sport, setSport] = useState('trail');
     const [entryType, setEntryType] = useState('entrainement');
     const [date, setDate] = useState(todayISO());
@@ -223,6 +225,32 @@ export default function RunningCairn() {
         catch (e) {
             setSaveError(true);
         }
+    }
+    function buildExportJson() {
+        return JSON.stringify({ exportedAt: todayISO(), count: activities.length, activities }, null, 2);
+    }
+    async function handleShareExport() {
+        const json = buildExportJson();
+        const fileName = `running-cairn-export-${todayISO()}.json`;
+        if (navigator.canShare && navigator.share) {
+            try {
+                const file = new File([json], fileName, { type: 'application/json' });
+                if (navigator.canShare({ files: [file] })) {
+                    await navigator.share({ files: [file], title: 'Running Cairn — export' });
+                    return;
+                }
+            }
+            catch (e) { /* on retombe sur la fenêtre de secours */ }
+        }
+        setExportOpen(true);
+    }
+    async function handleCopyExport() {
+        try {
+            await navigator.clipboard.writeText(buildExportJson());
+            setCopyDone(true);
+            setTimeout(() => setCopyDone(false), 2000);
+        }
+        catch (e) { /* ignore */ }
     }
     function resetForm() {
         setEntryType('entrainement');
@@ -386,21 +414,23 @@ export default function RunningCairn() {
         return Object.values(byYear).sort((a, b) => b.year.localeCompare(a.year));
     }, [sportActivities]);
     const monthGroups = useMemo(() => {
-        const byMonth = {};
+        const byGroup = {};
         const filtered = historyFilter === 'course' ? sportActivities.filter(a => a.type === 'course') : sportActivities;
+        const byYear = historyFilter === 'course';
         filtered.forEach(a => {
-            const k = monthKey(a.date);
-            if (!byMonth[k])
-                byMonth[k] = [];
-            byMonth[k].push(a);
+            const k = byYear ? a.date.slice(0, 4) : monthKey(a.date);
+            if (!byGroup[k])
+                byGroup[k] = [];
+            byGroup[k].push(a);
         });
-        return Object.entries(byMonth)
+        return Object.entries(byGroup)
             .sort((a, b) => b[0].localeCompare(a[0]))
             .map(([key, list]) => ({
             key,
-            label: monthLabel(list[0].date),
+            label: byYear ? key : monthLabel(list[0].date),
             list: list.sort((a, b) => b.date.localeCompare(a.date)),
             dist: list.reduce((s, a) => s + a.distanceKm, 0),
+            count: list.length,
         }));
     }, [sportActivities, historyFilter]);
     function toggleMonth(key) {
@@ -580,6 +610,26 @@ export default function RunningCairn() {
 
         .fl-empty { color: var(--text-muted); font-size: 14px; text-align: center; padding: 24px 10px; }
         .fl-warn { color: var(--warn); font-size: 12px; text-align: center; margin-top: 10px; }
+
+        .fl-export-link {
+          display: block; width: 100%; text-align: center; margin-top: 28px; padding: 10px;
+          background: none; border: none; color: var(--text-muted); font-family: 'Inter', sans-serif;
+          font-size: 12.5px; text-decoration: underline; cursor: pointer;
+        }
+        .fl-export-overlay {
+          position: fixed; inset: 0; background: rgba(5,6,12,0.72); display: flex; align-items: center;
+          justify-content: center; z-index: 50; padding: 24px;
+        }
+        .fl-export-box {
+          width: 100%; max-width: 420px; background: rgba(23,24,43,0.95); backdrop-filter: blur(18px);
+          border: 1px solid var(--border); border-radius: 16px; padding: 16px; display: flex; flex-direction: column; gap: 12px;
+        }
+        .fl-export-head { display: flex; justify-content: space-between; align-items: center; font-size: 14px; color: var(--text); }
+        .fl-export-text {
+          width: 100%; height: 240px; background: rgba(255,255,255,0.05); border: 1px solid var(--border);
+          border-radius: 10px; color: var(--text-muted); font-family: 'Courier New', monospace; font-size: 11px;
+          padding: 10px; box-sizing: border-box; resize: none;
+        }
       `),
         React.createElement("div", { className: "fl-hero-art" },
             React.createElement("svg", { className: "fl-mountains", viewBox: "0 0 380 200", preserveAspectRatio: "none" },
@@ -778,6 +828,11 @@ export default function RunningCairn() {
                     React.createElement("div", { className: "fl-month-head", onClick: () => toggleMonth(group.key) },
                         React.createElement("span", { className: "fl-month-head-left" }, group.label),
                         React.createElement("span", { className: "fl-month-head-right" },
+                            historyFilter === 'course' && React.createElement(React.Fragment, null,
+                                group.count,
+                                " course",
+                                group.count > 1 ? 's' : '',
+                                " \u00B7 "),
                             formatKm(group.dist),
                             " km",
                             React.createElement(ChevronDown, { size: 16, className: `fl-chevron ${isOpen ? 'open' : ''}` }))),
@@ -797,18 +852,3 @@ export default function RunningCairn() {
                                 formatSpeed(a.distanceKm, a.durationSec),
                                 a.elevationM > 0 && (React.createElement(React.Fragment, null,
                                     React.createElement("span", { className: "fl-entry-sep" }, "\u00B7"),
-                                    "D+ ",
-                                    Math.round(a.elevationM),
-                                    " m")),
-                                a.avgHr > 0 && (React.createElement(React.Fragment, null,
-                                    React.createElement("span", { className: "fl-entry-sep" }, "\u00B7"),
-                                    "FC ",
-                                    a.avgHr,
-                                    " bpm")))),
-                        React.createElement("button", { className: "fl-del-btn", onClick: () => handleDelete(a.id) },
-                            React.createElement(Trash2, { size: 15 })))))));
-            }))),
-        saveError && React.createElement("div", { className: "fl-warn" }, "La derni\u00E8re sortie n'a peut-\u00EAtre pas \u00E9t\u00E9 sauvegard\u00E9e \u2014 v\u00E9rifie ta connexion.")));
-}
-const rootEl = document.getElementById('root');
-ReactDOM.createRoot(rootEl).render(React.createElement(RunningCairn, null));
