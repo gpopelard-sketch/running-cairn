@@ -136,6 +136,7 @@ export default function RunningCairn() {
     const [loading, setLoading] = useState(true);
     const [saveError, setSaveError] = useState(false);
     const [formOpen, setFormOpen] = useState(false);
+    const [editingId, setEditingId] = useState(null);
     const [openMonths, setOpenMonths] = useState(new Set());
     const [statPeriod, setStatPeriod] = useState('semaine');
     const [focusMonthKey, setFocusMonthKey] = useState(monthKey(todayISO()));
@@ -154,6 +155,7 @@ export default function RunningCairn() {
     const [ss, setSs] = useState('');
     const [elevation, setElevation] = useState('');
     const [avgHr, setAvgHr] = useState('');
+    const [raceName, setRaceName] = useState('');
     const [formError, setFormError] = useState('');
     useEffect(() => {
         (async () => {
@@ -261,7 +263,26 @@ export default function RunningCairn() {
         setSs('');
         setElevation('');
         setAvgHr('');
+        setRaceName('');
         setFormError('');
+        setEditingId(null);
+    }
+    function openEditForm(a) {
+        setEditingId(a.id);
+        setEntryType(a.type || 'entrainement');
+        setDate(a.date);
+        setDistance(String(a.distanceKm).replace('.', ','));
+        const h = Math.floor(a.durationSec / 3600);
+        const m = Math.floor((a.durationSec % 3600) / 60);
+        const s = a.durationSec % 60;
+        setHh(h > 0 ? String(h) : '');
+        setMm(String(m));
+        setSs(String(s));
+        setElevation(a.elevationM ? String(a.elevationM).replace('.', ',') : '');
+        setAvgHr(a.avgHr ? String(a.avgHr) : '');
+        setRaceName(a.name || '');
+        setFormError('');
+        setFormOpen(true);
     }
     function handleAdd() {
         const dist = parseFloat((distance || '').replace(',', '.'));
@@ -278,17 +299,19 @@ export default function RunningCairn() {
             setFormError('Indique un temps.');
             return;
         }
-        const activity = {
-            id: uid(),
+        const fields = {
             date,
             sport,
             type: entryType,
+            name: entryType === 'course' ? raceName.trim() : '',
             distanceKm: dist,
             durationSec: totalSeconds,
             elevationM: elevation ? parseFloat(elevation.toString().replace(',', '.')) : 0,
             avgHr: avgHr ? parseInt(avgHr, 10) : 0,
         };
-        const newList = [...activities, activity];
+        const newList = editingId
+            ? activities.map(a => (a.id === editingId ? { ...a, ...fields } : a))
+            : [...activities, { id: uid(), ...fields }];
         persist(newList);
         setOpenMonths(prev => new Set([...prev, monthKey(date)]));
         resetForm();
@@ -597,11 +620,12 @@ export default function RunningCairn() {
         .fl-chevron.open { transform: rotate(180deg); }
 
         .fl-entry {
-          display: flex; align-items: center; padding: 10px 2px; gap: 10px;
+          display: flex; align-items: center; padding: 10px 2px; gap: 10px; cursor: pointer;
         }
         .fl-entry-bar { width: 4px; height: 34px; border-radius: 2px; flex-shrink: 0; }
         .fl-entry-main { flex: 1; }
         .fl-entry-date { font-size: 12px; color: var(--text-muted); }
+        .fl-entry-name { color: var(--text); font-weight: 500; }
         .fl-entry-figures { font-size: 14px; margin-top: 2px; }
         .fl-entry-figures b { font-weight: 600; }
         .fl-entry-sep { color: var(--text-muted); margin: 0 5px; }
@@ -698,9 +722,14 @@ export default function RunningCairn() {
                 " Course"))),
         formOpen && (React.createElement("div", { className: "fl-form" },
             React.createElement("div", { className: "fl-form-row" },
-                React.createElement("span", { className: "fl-form-title" }, entryType === 'course' ? 'Nouvelle course' : 'Nouvel entraînement'),
+                React.createElement("span", { className: "fl-form-title" }, editingId
+                    ? (entryType === 'course' ? 'Modifier la course' : "Modifier l'entraînement")
+                    : (entryType === 'course' ? 'Nouvelle course' : 'Nouvel entraînement')),
                 React.createElement("button", { className: "fl-close-btn", onClick: () => { setFormOpen(false); resetForm(); } },
                     React.createElement(X, { size: 20 }))),
+            entryType === 'course' && (React.createElement("div", { className: "fl-field" },
+                React.createElement("label", null, "Nom de la course"),
+                React.createElement("input", { type: "text", placeholder: "ex. Trail des Vosges", value: raceName, onChange: e => setRaceName(e.target.value) }))),
             React.createElement("div", { className: "fl-two-col" },
                 React.createElement("div", { className: "fl-field" },
                     React.createElement("label", null, "Date"),
@@ -730,7 +759,7 @@ export default function RunningCairn() {
                 " \u00B7 ",
                 React.createElement("b", null, preview.speed)) : React.createElement(React.Fragment, null, "\u00A0")),
             formError && React.createElement("div", { className: "fl-error" }, formError),
-            React.createElement("button", { className: "fl-submit", onClick: handleAdd }, "Enregistrer"))),
+            React.createElement("button", { className: "fl-submit", onClick: handleAdd }, editingId ? 'Enregistrer les modifications' : 'Enregistrer'))),
         sportActivities.length === 0 ? (React.createElement("div", { className: "fl-empty" }, "Aucune sortie enregistr\u00E9e. Ajoute ta premi\u00E8re course pour d\u00E9marrer le suivi.")) : (React.createElement(React.Fragment, null,
             React.createElement("div", { className: "fl-section-header" },
                 React.createElement("div", { className: "fl-section-title" }, "Statistiques"),
@@ -836,10 +865,14 @@ export default function RunningCairn() {
                             formatKm(group.dist),
                             " km",
                             React.createElement(ChevronDown, { size: 16, className: `fl-chevron ${isOpen ? 'open' : ''}` }))),
-                    isOpen && group.list.map(a => (React.createElement("div", { className: "fl-entry", key: a.id },
+                    isOpen && group.list.map(a => (React.createElement("div", { className: "fl-entry", key: a.id, onDoubleClick: () => openEditForm(a) },
                         React.createElement("div", { className: "fl-entry-bar", style: { background: a.type === 'course' ? 'var(--month)' : 'var(--trail)' } }),
                         React.createElement("div", { className: "fl-entry-main" },
-                            React.createElement("div", { className: "fl-entry-date" }, new Date(a.date + 'T00:00:00').toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' })),
+                            React.createElement("div", { className: "fl-entry-date" },
+                                new Date(a.date + 'T00:00:00').toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' }),
+                                a.name && React.createElement("span", { className: "fl-entry-name" },
+                                    " \u00B7 ",
+                                    a.name)),
                             React.createElement("div", { className: "fl-entry-figures" },
                                 React.createElement("b", null,
                                     formatKm(a.distanceKm),
@@ -860,7 +893,7 @@ export default function RunningCairn() {
                                     "FC ",
                                     a.avgHr,
                                     " bpm")))),
-                        React.createElement("button", { className: "fl-del-btn", onClick: () => handleDelete(a.id) },
+                        React.createElement("button", { className: "fl-del-btn", onClick: (e) => { e.stopPropagation(); handleDelete(a.id); } },
                             React.createElement(Trash2, { size: 15 })))))));
             }))),
         saveError && React.createElement("div", { className: "fl-warn" }, "La derni\u00E8re sortie n'a peut-\u00EAtre pas \u00E9t\u00E9 sauvegard\u00E9e \u2014 v\u00E9rifie ta connexion."),
