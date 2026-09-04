@@ -852,3 +852,31 @@ export default function RunningCairn() {
                                 formatSpeed(a.distanceKm, a.durationSec),
                                 a.elevationM > 0 && (React.createElement(React.Fragment, null,
                                     React.createElement("span", { className: "fl-entry-sep" }, "\u00B7"),
+                                    "D+ ",
+                                    Math.round(a.elevationM),
+                                    " m")),
+                                a.avgHr > 0 && (React.createElement(React.Fragment, null,
+                                    React.createElement("span", { className: "fl-entry-sep" }, "\u00B7"),
+                                    "FC ",
+                                    a.avgHr,
+                                    " bpm")))),
+                        React.createElement("button", { className: "fl-del-btn", onClick: () => handleDelete(a.id) },
+                            React.createElement(Trash2, { size: 15 })))))));
+            }))),
+        saveError && React.createElement("div", { className: "fl-warn" }, "La derni\u00E8re sortie n'a peut-\u00EAtre pas \u00E9t\u00E9 sauvegard\u00E9e \u2014 v\u00E9rifie ta connexion."),
+        React.createElement("button", { className: "fl-export-link", onClick: handleShareExport }, "Exporter mes donn\u00E9es (JSON)"),
+        exportOpen && (React.createElement("div", { className: "fl-export-overlay", onClick: () => setExportOpen(false) },
+            React.createElement("div", { className: "fl-export-box", onClick: (e) => e.stopPropagation() },
+                React.createElement("div", { className: "fl-export-head" },
+                    React.createElement("span", null,
+                        "Export \u2014 ",
+                        activities.length,
+                        " sortie",
+                        activities.length > 1 ? 's' : ''),
+                    React.createElement("button", { className: "fl-close-btn", onClick: () => setExportOpen(false) },
+                        React.createElement(X, { size: 18 }))),
+                React.createElement("textarea", { readOnly: true, className: "fl-export-text", value: buildExportJson(), onFocus: (e) => e.target.select() }),
+                React.createElement("button", { className: "fl-submit", onClick: handleCopyExport }, copyDone ? 'Copié !' : 'Copier tout'))))));
+}
+const rootEl = document.getElementById('root');
+ReactDOM.createRoot(rootEl).render(React.createElement(RunningCairn, null));
