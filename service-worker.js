@@ -1,4 +1,4 @@
-const CACHE = 'running-cairn-v1';
+const CACHE = 'running-cairn-v2';
 const ASSETS = ['./', './index.html', './app.js', './manifest.json', './icon-192.png', './icon-512.png', './icon-180.png'];
 
 self.addEventListener('install', (event) => {
